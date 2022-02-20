@@ -1,1 +1,1 @@
-autopep8 -i *.py
+autopep8 -i *.py --ignore E501

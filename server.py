@@ -7,18 +7,17 @@ TODO:
 - support various NNs.
 - add PPLM.
 """
-
+import logging
+import rocksdb
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import os
 import json
 from Crypto.Hash import keccak
 
 
-import logging
-
 logger = logging.getLogger(__name__)
-formatter = logging.Formatter(
-    '[%(asctime)s][%(levelname)s|%(filename)s:%(lineno)s] >> %(message)s'
-)
+formatter = logging.Formatter('[%(asctime)s][%(levelname)s|%(filename)s:%(lineno)s] >> %(message)s')
 fileHandler = logging.FileHandler('./server.log')
 fileHandler.setFormatter(formatter)
 logger.addHandler(fileHandler)
@@ -27,31 +26,8 @@ logger.setLevel(level=logging.DEBUG)
 logger.info('Server start.')
 
 
-import rocksdb
-
 db = rocksdb.DB("server.db", rocksdb.Options(create_if_missing=True))
 
-
-# import torch
-# from transformers import AutoTokenizer, AutoModelForCausalLM
-
-# # load model
-# # from https://github.com/kakaobrain/kogpt#python
-# tokenizer = AutoTokenizer.from_pretrained(
-#         'kakaobrain/kogpt', revision='KoGPT6B-ryan1.5b-float16',  # or float32 version: revision=KoGPT6B-ryan1.5b
-#         bos_token='[BOS]', eos_token='[EOS]', unk_token='[UNK]', pad_token='[PAD]', mask_token='[MASK]'
-# )
-# model = AutoModelForCausalLM.from_pretrained(
-#         'kakaobrain/kogpt', revision='KoGPT6B-ryan1.5b-float16',  # or float32 version: revision=KoGPT6B-ryan1.5b
-#         pad_token_id=tokenizer.eos_token_id,
-#         torch_dtype='auto', low_cpu_mem_usage=True
-# ).to(device='cuda', non_blocking=True)
-# # _ = model.eval()
-# print("Model Loaded.")
-
-
-from flask_cors import CORS
-from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 CORS(app)
@@ -94,8 +70,7 @@ def upload():
     max_length: int = params.get("max_length", 128)
 
     """get key"""
-    raw_key = address + str(nonce) + str(mode) + prompt + \
-        str(temperature) + str(max_length)
+    raw_key = address + str(nonce) + str(mode) + prompt + str(temperature) + str(max_length)
     k = keccak.new(digest_bits=256)
     k.update(raw_key.encode())
     hashed_key = k.hexdigest()
@@ -128,8 +103,7 @@ def upload():
         l = d.get("keys", list())  # must
         d["keys"] = l.append(hashed_key)
     db.put(address.encode(), json.dumps(d).encode())
-    logger.info('Data of key "' + hashed_key +
-                '" successfully put to "' + address + '".')
+    logger.info('Data of key "' + hashed_key + '" successfully put to "' + address + '".')
 
     """return"""
     # next: user enrolls the request at contract.
@@ -143,37 +117,71 @@ def upload():
     )
 
 
+@app.route('/inference', methods=['POST'])
 def inference():
     """
     Same as response.
     Server responses user's request one by one.
+
+    JSON data includes:
+        * "key": key of task.
+        * "result": inference result.
     """
+    logger.info('Inference start.')
 
-    # # inference
-    # with torch.no_grad():
-    #     tokens = tokenizer.encode(prompt, return_tensors='pt').to(
-    #         device='cuda', non_blocking=True)
-    #     gen_tokens = model.generate(
-    #         tokens, do_sample=True, temperature=temperature, max_length=max_length)
-    #     generated = tokenizer.batch_decode(gen_tokens)[0]
+    """read JSON"""
+    params = request.get_json()
+    key: str = params["key"]  # must
+    result: str = params.get("result", '')
 
-    # return generated
+    """DB"""
+    # (key => (input, output))
+    prev = db.get(key.encode())
+    if prev is None:
+        logger.warning('Data of key "' + key + '" not exists.')
+        logger.warning('Inference done with WARNING.')
+        return jsonify(
+            {
+                "error": {
+                    "code": 404,
+                    "message": 'Key "' + key + '" not exists.'
+                }
+            }
+        )
+    else:
+        d = json.loads(prev.decode())
+        d["output"] = {"result": result}
+        # TODO: output already exists.
+        db.put(key.encode(), json.dumps(d).encode())
+        logger.info('Result of key "' + key + '" successfully put."')
 
-    pass
-
-
-def check():
-    pass
+    """return"""
+    # next: server enrolls the response at contract.
+    logger.info('Inference done.')
+    return jsonify({})
 
 
 def download():
-    # ret = db.multi_get([b"key1", b"key2", b"key3"])
-    # print(ret[b"key1"])
-    # print(ret[b"key3"])
+    """
+    Same as check.
+    User checks existence of server's response about key.
+    Server gets task params.
+
+    JSON data includes:
+        * "key": key of task.
+
+    :return: JSON, including set of (request, response) in server.
+    """
     pass
 
 
 def history():
+    """
+    Same as batch_download.
+    """
+    # ret = db.multi_get([b"key1", b"key2", b"key3"])
+    # print(ret[b"key1"])
+    # print(ret[b"key3"])
     pass
 
 

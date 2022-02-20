@@ -2,6 +2,52 @@
 
 > powered by [KakaoBrain KoGPT](https://github.com/kakaobrain/kogpt)
 
+# How to start
+
+## Run server
+
+Install required packages:
+
+```bash
+$ python install -r requirements.txt
+```
+
+Start server:
+
+```bash
+$ cd server
+$ python server.py
+```
+```
+ * Serving Flask app 'server' (lazy loading)
+ * Environment: production
+   WARNING: This is a development server. Do not use it in a production deployment.
+   Use a production WSGI server instead.
+ * Debug mode: off
+ * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+ * Running on http://<your_ip_address>:<port_num>/ (Press CTRL+C to quit)
+```
+
+`<port_num>` is `33327` as default.
+
+### Curl
+
+```bash
+$ curl [-X <method>] [-H 'Content-Type: application/json'] [-d <data>] [other_options...] <server_url>/<call>
+```
+
+* `<method>` can be one of `<GET | POST | PUT | PATCH | DELETE>`.
+* `<call>` can be one of `<upload | inference | download>` currently.
+
+## Run daemon
+
+TBA
+
+### Curl
+
+TBA
+
 <!--
 # Features
 

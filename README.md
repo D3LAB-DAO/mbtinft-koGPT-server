@@ -11,7 +11,7 @@
 
 ### RESTful API
 
-`server.py`
+[`server.py`](./server/server.py)
 
 ### DB
 
@@ -21,21 +21,23 @@
 
 `server.log`
 
-## AI
+## Inference
 
 ![fig 2. AI system overview](./images/fig2.png)
 
 ### Daemon
 
-`daemon.py`
+[`daemon.py`](./inference/daemon.py)
 
-### GPT
+### KoGPT
 
-`koGPT.py`
+[`koGPT.py`](./inference/koGPT.py)
 
 ### PPLM
 
 Future work.
+
+[`pplm.py`](./inference/pplm.py)
 -->
 
 # Contact

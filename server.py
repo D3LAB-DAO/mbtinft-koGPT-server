@@ -1,11 +1,11 @@
-"""
-Author: Lukepark
-Email: lukepark327@gmail.com
+"""Inference server.
+@Author: Lukepark
+@Email: lukepark327@gmail.com
 
 TODO:
-- change DB to IPFS.
-- support various NNs.
-- add PPLM.
+    * change DB to IPFS.
+    * support various NNs.
+    * add PPLM.
 """
 import logging
 import rocksdb

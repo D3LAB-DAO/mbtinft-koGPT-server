@@ -80,7 +80,7 @@ def upload():
     # 1. (hashed_key => (input, output))
     prev = db.get(hashed_key.encode())
     if prev is None:
-        d = {"input": params, "output": dict()}
+        d = {"input": params}
         db.put(hashed_key.encode(), json.dumps(d).encode())
         logger.info('Data of key "' + hashed_key + '" successfully put.')
     else:
@@ -144,7 +144,7 @@ def inference():
             {
                 "error": {
                     "code": 404,
-                    "message": 'Key "' + key + '" not exists.'
+                    "message": 'Data of key "' + key + '" not exists.'
                 }
             }
         )
@@ -161,6 +161,7 @@ def inference():
     return jsonify({})
 
 
+@app.route('/download', methods=['POST'])
 def download():
     """
     Same as check.
@@ -170,9 +171,54 @@ def download():
     JSON data includes:
         * "key": key of task.
 
-    :return: JSON, including set of (request, response) in server.
+    :return: JSON, including response.
     """
-    pass
+    logger.info('Download start.')
+
+    """read JSON"""
+    params = request.get_json()
+    key: str = params["key"]  # must
+
+    """DB"""
+    # (key => (input, output))
+    prev = db.get(key.encode())
+    if prev is None:
+        logger.warning('Data of key "' + key + '" not exists.')
+        logger.warning('Download done with WARNING.')
+        return jsonify(
+            {
+                "error": {
+                    "code": 404,
+                    "message": 'Data of key "' + key + '" not exists.'
+                }
+            }
+        )
+    else:
+        d = json.loads(prev.decode())
+        try:
+            result = d["output"]["result"]
+        except(KeyError):
+            logger.warning('Result of key "' + key + '" not exists.')
+            logger.warning('Download done with WARNING.')
+            return jsonify(
+                {
+                    "error": {
+                        "code": 404,
+                        "message": 'Result of key "' + key + '" not exists.'
+                    }
+                }
+            )
+        logger.info('Result of key "' + key + '" successfully get."')
+
+    """return"""
+    logger.info('Download done.')
+    return jsonify(
+        {
+            "data": {
+                "result": result
+            }
+        }
+    )
 
 
 def history():

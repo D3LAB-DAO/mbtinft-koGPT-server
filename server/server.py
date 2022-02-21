@@ -55,6 +55,7 @@ def upload():
         * "prompt": input text.
         * "temperature": 0.8 as default.
         * "max_length": 128 as default. min 1. max 1024.
+        * "deadline": deadline of request.
 
     :return: JSON, including hashed key of set of (request, response) in server.
     """
@@ -70,7 +71,7 @@ def upload():
     max_length: int = params.get("max_length", 128)
 
     """get key"""
-    raw_key = address + str(nonce) + str(mode) + prompt + str(temperature) + str(max_length)
+    raw_key = address + str(nonce) + str(deadline)
     k = keccak.new(digest_bits=256)
     k.update(raw_key.encode())
     hashed_key = k.hexdigest()

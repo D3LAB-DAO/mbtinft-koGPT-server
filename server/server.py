@@ -46,6 +46,7 @@ def upload():
 
     JSON data includes:
         * "address": task giver's address.
+        * "tokenId": which NFT token.
         * "nonce": task giver's counter which indicates how many txs are sent.
         * "mode":
             * 0: writing
@@ -55,7 +56,6 @@ def upload():
         * "prompt": input text.
         * "temperature": 0.8 as default.
         * "max_length": 128 as default. min 1. max 1024.
-        * "deadline": deadline of request.
 
     :return: JSON, including hashed key of set of (request, response) in server.
     """
@@ -64,6 +64,7 @@ def upload():
     """read JSON"""
     params = request.get_json()
     address: str = params["address"]  # must
+    tokenId: int = params["tokenId"]  # must
     nonce: int = params["nonce"]  # must
     mode: int = params.get("mode", 0)
     prompt: str = params.get("prompt", '')
@@ -71,7 +72,7 @@ def upload():
     max_length: int = params.get("max_length", 128)
 
     """get key"""
-    raw_key = address + str(nonce) + str(deadline)
+    raw_key = address + str(tokenId) + str(nonce)
     k = keccak.new(digest_bits=256)
     k.update(raw_key.encode())
     hashed_key = k.hexdigest()

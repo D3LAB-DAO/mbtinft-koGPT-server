@@ -72,6 +72,7 @@ def upload():
     max_length: int = params.get("max_length", 128)
 
     """get key"""
+    # TODO: sync with solidity keccak256
     raw_key = address + str(tokenId) + str(nonce)
     k = keccak.new(digest_bits=256)
     k.update(raw_key.encode())
@@ -96,16 +97,25 @@ def upload():
                 }
             }
         )
-    # 2. (address => list of hashed_key)
-    prev = db.get(address.encode())
+    # 2. (address + tokenId => list of hashed_key)
+    address_and_tokenId = address + str(tokenId)
+    k = keccak.new(digest_bits=256)
+    k.update(address_and_tokenId.encode())
+    hashed_address_and_tokenId = k.hexdigest()
+    # print(hashed_address_and_tokenId)
+
+    prev = db.get(hashed_address_and_tokenId.encode())
     if prev is None:
         d = {"keys": [hashed_key]}
     else:
         d = json.loads(prev.decode())
         l = d.get("keys", list())  # must
         d["keys"] = l.append(hashed_key)
-    db.put(address.encode(), json.dumps(d).encode())
-    logger.info('Data of key "' + hashed_key + '" successfully put to "' + address + '".')
+
+    print(d)
+
+    db.put(hashed_address_and_tokenId.encode(), json.dumps(d).encode())
+    logger.info('Data of key "' + hashed_key + '" successfully put to "' + address + '" and tokenId "' + str(tokenId) + '".')
 
     """return"""
     # next: user enrolls the request at contract.
@@ -117,6 +127,10 @@ def upload():
             }
         }
     )
+
+
+def cancle():
+    pass
 
 
 @app.route('/inference', methods=['POST'])
@@ -198,6 +212,7 @@ def download():
     else:
         d = json.loads(prev.decode())
         try:
+            prompt = d["input"]["prompt"]
             result = d["output"]["result"]
         except(KeyError):
             logger.warning('Result of key "' + key + '" not exists.')
@@ -217,22 +232,109 @@ def download():
     return jsonify(
         {
             "data": {
+                "prompt": prompt,
                 "result": result
             }
         }
     )
 
 
+@app.route('/keys', methods=['POST'])
+def keys():
+    """
+    User gets list of keys.
+
+    JSON data includes:
+        * "address": address to get keys.
+        * "tokenId": tokenId to get keys.
+
+    :return: JSON, keys.
+    """
+    logger.info('Keys start.')
+
+    """read JSON"""
+    params = request.get_json()
+    address: str = params["address"]  # must
+    tokenId: str = params["tokenId"]  # must
+    # TODO: boundary
+
+    """DB"""
+    # (address _ tokenId => list of hashed_key)
+    address_and_tokenId = address + str(tokenId)
+    k = keccak.new(digest_bits=256)
+    k.update(address_and_tokenId.encode())
+    hashed_address_and_tokenId = k.hexdigest()
+    # print(hashed_address_and_tokenId)
+
+    prev = db.get(hashed_address_and_tokenId.encode())
+    d = json.loads(prev.decode())
+    l = d.get("keys", list())
+    # TODO: Exception
+
+    logger.info('Address "' + address + '"and tokenId "' + str(tokenId) + '" is inquired.')
+
+    """return"""
+    # next: user enrolls the request at contract.
+    logger.info('Keys done.')
+    return jsonify(
+        {
+            "data": {
+                "keys": l
+            }
+        }
+    )
+
+
+@app.route('/history', methods=['POST'])
 def history():
     """
     Same as batch_download.
+
+    JSON data includes:
+        * "address": address to get history.
+        * "tokenId": tokenId to get history.
+
+    :return: JSON, batch of (input, output).
     """
-    # ret = db.multi_get([b"key1", b"key2", b"key3"])
-    # print(ret[b"key1"])
-    # print(ret[b"key3"])
-    pass
+    logger.info('History start.')
+
+    """read JSON"""
+    params = request.get_json()
+    address: str = params["address"]  # must
+    tokenId: str = params["tokenId"]  # must
+    # TODO: boundary
+
+    """DB"""
+    # (address _ tokenId => list of hashed_key)
+    address_and_tokenId = address + str(tokenId)
+    k = keccak.new(digest_bits=256)
+    k.update(address_and_tokenId.encode())
+    hashed_address_and_tokenId = k.hexdigest()
+    # print(hashed_address_and_tokenId)
+
+    prev = db.get(hashed_address_and_tokenId.encode())
+    d = json.loads(prev.decode())
+    l = d.get("keys", list())
+    # TODO: Exception
+
+    logger.info('Address "' + address + '" and tokenId "' + str(tokenId) + '" is inquired.')
+
+    history = db.multi_get([b.encode() for b in l])
+    history = {k.decode(): v.decode() for k, v in history.items()}  # decode
+
+    """return"""
+    # next: user enrolls the request at contract.
+    logger.info('History done.')
+    return jsonify(
+        {
+            "data": {
+                "history": history
+            }
+        }
+    )
 
 
+@app.route('/remove', methods=['POST'])
 def remove():
     # db.delete(b"key")
     pass

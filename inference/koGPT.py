@@ -11,8 +11,7 @@ tokenizer = AutoTokenizer.from_pretrained(
 model = AutoModelForCausalLM.from_pretrained(
     # or float32 version: revision=KoGPT6B-ryan1.5b
     'kakaobrain/kogpt', revision='KoGPT6B-ryan1.5b-float16',
-    pad_token_id=tokenizer.eos_token_id,
-    torch_dtype='auto', low_cpu_mem_usage=True
+    pad_token_id=tokenizer.eos_token_id, torch_dtype='auto', low_cpu_mem_usage=True
 ).to(device='cuda', non_blocking=True)
 # _ = model.eval()
 print("Model Loaded.")

@@ -112,8 +112,6 @@ def upload():
         l = d.get("keys", list())  # must
         d["keys"] = l.append(hashed_key)
 
-    print(d)
-
     db.put(hashed_address_and_tokenId.encode(), json.dumps(d).encode())
     logger.info('Data of key "' + hashed_key + '" successfully put to "' + address + '" and tokenId "' + str(tokenId) + '".')
 

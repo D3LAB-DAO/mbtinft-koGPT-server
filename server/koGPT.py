@@ -1,6 +1,7 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
+
 """load model"""
 # from https://github.com/kakaobrain/kogpt#python
 tokenizer = AutoTokenizer.from_pretrained(
@@ -16,11 +17,10 @@ model = AutoModelForCausalLM.from_pretrained(
 # _ = model.eval()
 print("Model Loaded.")
 
-"""inference"""
-with torch.no_grad():
-    tokens = tokenizer.encode(prompt, return_tensors='pt').to(
-        device='cuda', non_blocking=True)
-    gen_tokens = model.generate(
-        tokens, do_sample=True, temperature=temperature, max_length=max_length)
-    generated = tokenizer.batch_decode(gen_tokens)[0]
-return generated
+
+def inference(prompt, temperature, max_length, cutFrom: int = 0):
+    with torch.no_grad():
+        tokens = tokenizer.encode(prompt, return_tensors='pt').to(device='cuda', non_blocking=True)
+        gen_tokens = model.generate(tokens, do_sample=True, temperature=temperature, max_length=len(prompt) + max_length)
+        generated = tokenizer.batch_decode(gen_tokens)[0]
+    return generated[cutFrom:].split('[EOS]')[0].split('\n\n')[0]  # TODO: regularization

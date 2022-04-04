@@ -11,9 +11,15 @@ import logging
 import rocksdb
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import requests
 import os
 import json
 from Crypto.Hash import keccak
+
+
+# Get setting
+SETTING = json.load(open('./setting.json', 'r'))
+INFERENCE_URL = SETTING['inference_url']
 
 
 logger = logging.getLogger(__name__)
@@ -22,7 +28,6 @@ fileHandler = logging.FileHandler('./server.log')
 fileHandler.setFormatter(formatter)
 logger.addHandler(fileHandler)
 logger.setLevel(level=logging.DEBUG)
-
 logger.info('Server start.')
 
 
@@ -66,10 +71,19 @@ def upload():
     address: str = params["address"]  # must
     tokenId: int = params["tokenId"]  # must
     nonce: int = params["nonce"]  # must
-    mode: int = params.get("mode", 0)
-    prompt: str = params.get("prompt", '')
-    temperature: float = params.get("temperature", 0.8)
-    max_length: int = params.get("max_length", 128)
+    mode: int = params.get("mode", 0) or 0
+    prompt: str = params.get("prompt", '') or ''
+    temperature: float = params.get("temperature", 0.8) or 0.8
+    max_length: int = params.get("max_length", 128) or 128
+    params = {
+        "address": address,
+        "tokenId": tokenId,
+        "nonce": nonce,
+        "mode": mode,
+        "prompt": prompt,
+        "temperature": temperature,
+        "max_length": max_length
+    }
 
     """get key"""
     # TODO: sync with solidity keccak256
@@ -82,21 +96,22 @@ def upload():
     """DB"""
     # 1. (hashed_key => (input, output))
     prev = db.get(hashed_key.encode())
-    if prev is None:
-        d = {"input": params}
-        db.put(hashed_key.encode(), json.dumps(d).encode())
-        logger.info('Data of key "' + hashed_key + '" successfully put.')
-    else:
+    if prev is not None:
         logger.warning('Data of key "' + hashed_key + '" already exists.')
-        logger.warning('Upload done with WARNING.')
-        return jsonify(
-            {
-                "error": {
-                    "code": 409,
-                    "message": 'Key "' + hashed_key + '" already exists.'
-                }
-            }
-        )
+        # logger.warning('Upload done with WARNING.')
+        # return jsonify(
+        #     {
+        #         "error": {
+        #             "code": 409,
+        #             "message": 'Key "' + hashed_key + '" already exists.'
+        #         }
+        #     }
+        # )
+        db.delete(hashed_key.encode())
+    d = {"input": params}
+    db.put(hashed_key.encode(), json.dumps(d).encode())
+    logger.info('Data of key "' + hashed_key + '" successfully put.')
+
     # 2. (address + tokenId => list of hashed_key)
     address_and_tokenId = address + str(tokenId)
     k = keccak.new(digest_bits=256)
@@ -109,7 +124,7 @@ def upload():
         d = {"keys": [hashed_key]}
     else:
         d = json.loads(prev.decode())
-        l = d.get("keys", list())  # must
+        l = d.get("keys", list()) or list()  # must
         d["keys"] = l.append(hashed_key)
 
     db.put(hashed_address_and_tokenId.encode(), json.dumps(d).encode())
@@ -146,7 +161,7 @@ def inference():
     """read JSON"""
     params = request.get_json()
     key: str = params["key"]  # must
-    result: str = params.get("result", '')
+    # result: str = params.get("result", '') or ''  # See below `get result` comment
 
     """DB"""
     # (key => (input, output))
@@ -164,6 +179,35 @@ def inference():
         )
     else:
         d = json.loads(prev.decode())
+
+        # get result
+        try:
+            result: str = params["result"]
+        except(KeyError):
+            mode = d["input"]["mode"]
+            prompt = d["input"]["prompt"]
+            temperature = d["input"]["temperature"]
+            max_length = d["input"]["max_length"]
+
+            if mode == 0:  # writing
+                api = "writing"
+            elif mode == 1:  # chatting
+                api = "chat"
+            elif mode == 2:  # QnA
+                api = "qna"
+            elif mode == 3:  # three-line acrostic poem (三行詩)
+                api = "three"
+
+            result: str = requests.post(
+                INFERENCE_URL + api,
+                json={
+                    "mode": mode,
+                    "prompt": prompt,
+                    "temperature": temperature,
+                    "max_length": max_length
+                }
+            ).text
+
         d["output"] = {"result": result}
         # TODO: output already exists.
         db.put(key.encode(), json.dumps(d).encode())
@@ -172,7 +216,11 @@ def inference():
     """return"""
     # next: server enrolls the response at contract.
     logger.info('Inference done.')
-    return jsonify({})
+    return jsonify({
+        "data": {
+            "result": result
+        }
+    })
 
 
 @app.route('/download', methods=['POST'])
@@ -266,7 +314,7 @@ def keys():
 
     prev = db.get(hashed_address_and_tokenId.encode())
     d = json.loads(prev.decode())
-    l = d.get("keys", list())
+    l = d.get("keys", list()) or list()
     # TODO: Exception
 
     logger.info('Address "' + address + '"and tokenId "' + str(tokenId) + '" is inquired.')
@@ -312,7 +360,7 @@ def history():
 
     prev = db.get(hashed_address_and_tokenId.encode())
     d = json.loads(prev.decode())
-    l = d.get("keys", list())
+    l = d.get("keys", list()) or list()
     # TODO: Exception
 
     logger.info('Address "' + address + '" and tokenId "' + str(tokenId) + '" is inquired.')
